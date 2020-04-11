@@ -182,54 +182,54 @@ void* scv_work(void* arg) {
 				pthread_exit(NULL);
 			}
 
+			// Unlock command_center_mutex and check for possible error
+			if(pthread_mutex_unlock(&command_center.command_center_mutex) != 0) {
+				perror("pthread_mutex_unlock");
+			}
+
 			// Travel to mineral_block
 			sleep(SCV_TRAVEL_TIME_TO_MINERAL_BLOCK);
 
 			// Mined minerals by SCV
 			mined_minerals = 0;
 
-			// Unlock command_center_mutex and check for possible error
-			if(pthread_mutex_unlock(&command_center.command_center_mutex) != 0) {
-				perror("pthread_mutex_unlock");
-			}
-
 			// Try locking mineral_block_mutex and check for possible error
 			if(pthread_mutex_trylock(&scv_info.mineral_blocks[mineral_block_index].mineral_block_mutex) == 0) {
 
-				// Check if current block is empty
-				if(scv_info.mineral_blocks[mineral_block_index].minerals_left == 0) {
-					continue;
-				}
+				// Check if current block has minerals
+				if(scv_info.mineral_blocks[mineral_block_index].minerals_left != 0) {
 
-				// Task requirements
-				printf("SCV %d is mining from mineral block %d\n", scv_info.id, mineral_block_index + 1);
+					// Task requirements
+					printf("SCV %d is mining from mineral block %d\n", scv_info.id, mineral_block_index + 1);
 
-				// If there are less than 8 minerals to mine
-				if(scv_info.mineral_blocks[mineral_block_index].minerals_left <= MINERALS_PER_MINE) {
+					// If there are less than 8 minerals to mine
+					if(scv_info.mineral_blocks[mineral_block_index].minerals_left <= MINERALS_PER_MINE) {
 
-					// Mine minerals
-					mined_minerals = scv_info.mineral_blocks[mineral_block_index].minerals_left;
-					scv_info.mineral_blocks[mineral_block_index].minerals_left = 0;
-					
-					// Lock command_center_mutex and check for possible error
-					if(pthread_mutex_lock(&command_center.command_center_mutex) != 0) {
-						perror("pthread_mutex_lock");
+						// Mine minerals
+						mined_minerals = scv_info.mineral_blocks[mineral_block_index].minerals_left;
+						scv_info.mineral_blocks[mineral_block_index].minerals_left = 0;
+						
+						// Lock command_center_mutex and check for possible error
+						if(pthread_mutex_lock(&command_center.command_center_mutex) != 0) {
+							perror("pthread_mutex_lock");
+						}
+
+						// Mark mineral block as empty
+						command_center.empty_mineral_blocks += 1;
+
+						// Unlock command_center_mutex and check for possible error
+						if(pthread_mutex_unlock(&command_center.command_center_mutex) != 0) {
+							perror("pthread_mutex_unlock");
+						}
+
+					}
+					// If there are more than 8 minerals to mine
+					else {
+						// Mine minerals
+						mined_minerals = MINERALS_PER_MINE;
+						scv_info.mineral_blocks[mineral_block_index].minerals_left -= mined_minerals;
 					}
 
-					// Mark mineral block as empty
-					command_center.empty_mineral_blocks += 1;
-
-					// Unlock command_center_mutex and check for possible error
-					if(pthread_mutex_unlock(&command_center.command_center_mutex) != 0) {
-						perror("pthread_mutex_unlock");
-					}
-
-				}
-				// If there are more than 8 minerals to mine
-				else {
-					// Mine minerals
-					mined_minerals = MINERALS_PER_MINE;
-					scv_info.mineral_blocks[mineral_block_index].minerals_left -= mined_minerals;
 				}
 
 				// Unlock mineral_block_mutex and check for possible error
@@ -243,6 +243,7 @@ void* scv_work(void* arg) {
 			mineral_block_index ++;
 
 		} while(mined_minerals == 0);
+
 
 		// Task requirements
 		printf("SCV %d is transporting minerals\n", scv_info.id);
